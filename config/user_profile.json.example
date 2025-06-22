@@ -1,0 +1,73 @@
+{
+  "personal_info": {
+    "name": "Your Name",
+    "email": "your.email@example.com",
+    "linkedin_url": "https://linkedin.com/in/yourprofile",
+    "location": "San Francisco, CA",
+    "willing_to_relocate": true
+  },
+  "experience": {
+    "years_of_experience": 5,
+    "previous_roles": [
+      "Product Manager at TechCorp",
+      "Business Analyst at ConsultingFirm",
+      "MBA Student at Top Business School"
+    ],
+    "industries": ["Technology", "Consulting", "Finance"],
+    "company_sizes": ["Startup", "Mid-size", "Enterprise"]
+  },
+  "preferences": {
+    "target_roles": [
+      "Senior Product Manager",
+      "Principal Product Manager",
+      "Director of Product"
+    ],
+    "preferred_companies": [
+      "Google", "Meta", "Amazon", "Microsoft", "Apple"
+    ],
+    "preferred_locations": [
+      "San Francisco", "New York", "Seattle", "Remote"
+    ],
+    "salary_range": {
+      "min": 150000,
+      "max": 300000,
+      "currency": "USD"
+    },
+    "work_type": ["Full-time", "Remote", "Hybrid"]
+  },
+  "skills": {
+    "technical": [
+      "Product Management",
+      "Data Analysis",
+      "SQL",
+      "Python",
+      "A/B Testing"
+    ],
+    "business": [
+      "Strategy",
+      "Market Research",
+      "Financial Modeling",
+      "Business Development"
+    ],
+    "soft_skills": [
+      "Leadership",
+      "Communication",
+      "Problem Solving",
+      "Stakeholder Management"
+    ]
+  },
+  "education": {
+    "degrees": [
+      {
+        "degree": "MBA",
+        "school": "Top Business School",
+        "graduation_year": 2023
+      },
+      {
+        "degree": "BS Computer Science",
+        "school": "University Name",
+        "graduation_year": 2019
+      }
+    ]
+  }
+}

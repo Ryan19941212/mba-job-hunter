@@ -1,0 +1,138 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: mba-job-hunter-db
+    environment:
+      POSTGRES_DB: mba_job_hunter
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - mba-job-hunter-network
+    restart: unless-stopped
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: mba-job-hunter-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - mba-job-hunter-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # FastAPI Application
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: mba-job-hunter-api
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/mba_job_hunter
+      - REDIS_URL=redis://redis:6379
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - LOG_LEVEL=INFO
+      - SECRET_KEY=your-secret-key-change-in-production
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./logs:/app/logs
+      - ./config:/app/config:ro
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - mba-job-hunter-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Celery Worker (for background tasks)
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: mba-job-hunter-worker
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/mba_job_hunter
+      - REDIS_URL=redis://redis:6379
+      - ENVIRONMENT=development
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./logs:/app/logs
+      - ./config:/app/config:ro
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - mba-job-hunter-network
+    restart: unless-stopped
+    command: celery -A app.services.celery_app worker --loglevel=info
+
+  # Celery Beat (for scheduled tasks)
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: mba-job-hunter-scheduler
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/mba_job_hunter
+      - REDIS_URL=redis://redis:6379
+      - ENVIRONMENT=development
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./logs:/app/logs
+      - ./config:/app/config:ro
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - mba-job-hunter-network
+    restart: unless-stopped
+    command: celery -A app.services.celery_app beat --loglevel=info
+
+  # Nginx (optional - for production)
+  nginx:
+    image: nginx:alpine
+    container_name: mba-job-hunter-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - api
+    networks:
+      - mba-job-hunter-network
+    restart: unless-stopped
+    profiles:
+      - production
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  mba-job-hunter-network:
+    driver: bridge
