@@ -8,8 +8,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, Field, validator, ConfigDict
-from pydantic.types import EmailStr
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class JobBase(BaseModel):
@@ -37,14 +36,6 @@ class JobBase(BaseModel):
     
     skills_required: Optional[List[str]] = Field(None, description="Required skills")
     benefits: Optional[List[str]] = Field(None, description="Job benefits")
-    
-    @validator('salary_max')
-    def validate_salary_range(cls, v, values):
-        """Validate that max salary is greater than min salary."""
-        if v is not None and 'salary_min' in values and values['salary_min'] is not None:
-            if v < values['salary_min']:
-                raise ValueError('Maximum salary must be greater than minimum salary')
-        return v
 
 
 class JobCreate(JobBase):
@@ -184,14 +175,6 @@ class JobSearchParams(BaseModel):
     posted_days_ago: Optional[int] = Field(None, ge=1, le=365, description="Posted within N days")
     
     skills: Optional[List[str]] = Field(None, description="Required skills")
-    
-    @validator('salary_max')
-    def validate_salary_range(cls, v, values):
-        """Validate salary range."""
-        if v is not None and 'salary_min' in values and values['salary_min'] is not None:
-            if v < values['salary_min']:
-                raise ValueError('Maximum salary must be greater than minimum salary')
-        return v
 
 
 class JobAnalysisResponse(BaseModel):
@@ -258,13 +241,3 @@ class JobApplicationUpdate(BaseModel):
     interview_date: Optional[datetime] = Field(None, description="Interview date")
     follow_up_date: Optional[datetime] = Field(None, description="Follow-up date")
     
-    @validator('status')
-    def validate_status(cls, v):
-        """Validate application status."""
-        valid_statuses = [
-            "interested", "applied", "phone_screen", "interview", 
-            "final_round", "offer", "rejected", "withdrawn"
-        ]
-        if v not in valid_statuses:
-            raise ValueError(f'Status must be one of: {", ".join(valid_statuses)}')
-        return v

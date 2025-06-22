@@ -13,7 +13,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
-from app.api.deps import get_db, cache_helper
+from app.api.deps import get_db
+from app.core.database import cache_manager
 from app.core.config import get_settings
 from app.core.database import db_manager
 from app.utils.logger import get_logger
@@ -178,7 +179,7 @@ async def get_metrics(
     """
     # Check cache for metrics
     cache_key = "app_metrics"
-    cached_metrics = await cache_helper.get_cached_response(cache_key)
+    cached_metrics = await cache_manager.get(cache_key)
     
     if cached_metrics:
         import json
@@ -203,7 +204,7 @@ async def get_metrics(
         
         # Cache metrics for 30 seconds
         import json
-        await cache_helper.set_cached_response(
+        await cache_manager.set(
             cache_key, 
             json.dumps(metrics, default=str), 
             expire_seconds=30

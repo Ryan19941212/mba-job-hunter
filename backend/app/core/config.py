@@ -10,7 +10,8 @@ from functools import lru_cache
 import json
 from pathlib import Path
 
-from pydantic import BaseSettings, Field, validator
+from pydantic_settings import BaseSettings
+from pydantic import Field, HttpUrl
 from pydantic import PostgresDsn, RedisDsn
 
 
@@ -25,6 +26,7 @@ class Settings(BaseSettings):
     HOST: str = Field("0.0.0.0", env="HOST")
     PORT: int = Field(8000, env="PORT")
     LOG_LEVEL: str = Field("INFO", env="LOG_LEVEL")
+    TESTING: bool = Field(False, env="TESTING")
     
     # Security
     SECRET_KEY: str = Field(..., env="SECRET_KEY")
@@ -64,30 +66,31 @@ class Settings(BaseSettings):
     # Rate Limiting
     RATE_LIMIT_PER_MINUTE: int = Field(60, env="RATE_LIMIT_PER_MINUTE")
     
-    # CORS
-    ALLOWED_HOSTS: List[str] = Field(
-        ["localhost", "127.0.0.1", "0.0.0.0"],
-        env="ALLOWED_HOSTS"
-    )
+    # CORS - simplified to avoid parsing issues
+    CORS_ORIGINS: str = Field("http://localhost:3000,http://localhost:8080,http://127.0.0.1:3000", env="CORS_ORIGINS")
+    CORS_CREDENTIALS: bool = Field(True, env="CORS_CREDENTIALS")
+    CORS_METHODS: str = Field("*", env="CORS_METHODS")
+    CORS_HEADERS: str = Field("*", env="CORS_HEADERS")
     
     # LinkedIn Credentials (for scraping)
     LINKEDIN_EMAIL: Optional[str] = Field(None, env="LINKEDIN_EMAIL")
     LINKEDIN_PASSWORD: Optional[str] = Field(None, env="LINKEDIN_PASSWORD")
     
-    @validator("ALLOWED_HOSTS", pre=True)
-    def parse_allowed_hosts(cls, v: Any) -> List[str]:
-        """Parse allowed hosts from string or list."""
-        if isinstance(v, str):
-            return [host.strip() for host in v.split(",")]
-        return v
+    def get_cors_origins_list(self) -> List[str]:
+        """Get CORS origins as a list."""
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
     
-    @validator("LOG_LEVEL")
-    def validate_log_level(cls, v: str) -> str:
-        """Validate log level."""
-        valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
-        if v.upper() not in valid_levels:
-            raise ValueError(f"LOG_LEVEL must be one of {valid_levels}")
-        return v.upper()
+    def get_cors_methods_list(self) -> List[str]:
+        """Get CORS methods as a list."""
+        if self.CORS_METHODS == "*":
+            return ["*"]
+        return [method.strip() for method in self.CORS_METHODS.split(",")]
+    
+    def get_cors_headers_list(self) -> List[str]:
+        """Get CORS headers as a list."""
+        if self.CORS_HEADERS == "*":
+            return ["*"]
+        return [header.strip() for header in self.CORS_HEADERS.split(",")]
     
     class Config:
         """Pydantic configuration."""
@@ -151,5 +154,4 @@ def load_app_settings() -> Dict[str, Any]:
         return {}
 
 
-# Global settings instance
-settings = get_settings()
+# Global settings instance - removed to avoid circular import

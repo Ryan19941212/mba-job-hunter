@@ -1,5 +1,8 @@
 version: '3.8'
 
+# MBA Job Hunter - Docker Compose Configuration
+# This file defines the development environment with all required services
+
 services:
   # PostgreSQL Database
   postgres:
@@ -39,12 +42,17 @@ services:
       target: production
     container_name: mba-job-hunter-api
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/mba_job_hunter
-      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/mba_job_hunter
+      - REDIS_URL=redis://redis:6379/0
       - ENVIRONMENT=development
       - DEBUG=true
       - LOG_LEVEL=INFO
-      - SECRET_KEY=your-secret-key-change-in-production
+      - SECRET_KEY=your-secret-key-change-in-production-make-it-32-chars-minimum
+      - HOST=0.0.0.0
+      - PORT=8000
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:8080
+      - ENABLE_BACKGROUND_SCRAPING=true
+      - ENABLE_AUTO_MATCHING=true
     ports:
       - "8000:8000"
     volumes:
@@ -57,7 +65,7 @@ services:
       - mba-job-hunter-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -71,10 +79,11 @@ services:
       target: production
     container_name: mba-job-hunter-worker
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/mba_job_hunter
-      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/mba_job_hunter
+      - REDIS_URL=redis://redis:6379/0
       - ENVIRONMENT=development
       - LOG_LEVEL=INFO
+      - SECRET_KEY=your-secret-key-change-in-production-make-it-32-chars-minimum
     volumes:
       - ./logs:/app/logs
       - ./config:/app/config:ro
@@ -84,7 +93,9 @@ services:
     networks:
       - mba-job-hunter-network
     restart: unless-stopped
-    command: celery -A app.services.celery_app worker --loglevel=info
+    # Note: Celery integration would need to be implemented
+    # command: celery -A app.services.celery_app worker --loglevel=info
+    command: python -m app.services.background_worker
 
   # Celery Beat (for scheduled tasks)
   scheduler:
@@ -94,10 +105,11 @@ services:
       target: production
     container_name: mba-job-hunter-scheduler
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/mba_job_hunter
-      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/mba_job_hunter
+      - REDIS_URL=redis://redis:6379/0
       - ENVIRONMENT=development
       - LOG_LEVEL=INFO
+      - SECRET_KEY=your-secret-key-change-in-production-make-it-32-chars-minimum
     volumes:
       - ./logs:/app/logs
       - ./config:/app/config:ro
@@ -107,7 +119,9 @@ services:
     networks:
       - mba-job-hunter-network
     restart: unless-stopped
-    command: celery -A app.services.celery_app beat --loglevel=info
+    # Note: Celery integration would need to be implemented  
+    # command: celery -A app.services.celery_app beat --loglevel=info
+    command: python -m app.services.scheduler
 
   # Nginx (optional - for production)
   nginx:
