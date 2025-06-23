@@ -1,0 +1,54 @@
+{
+  "personal_info": {
+    "name": "",
+    "email": "",
+    "linkedin_url": "",
+    "location": "",
+    "preferred_locations": []
+  },
+  "education": {
+    "mba_school": "",
+    "mba_year": "",
+    "undergraduate_school": "",
+    "undergraduate_major": "",
+    "gpa": "",
+    "certifications": []
+  },
+  "experience": {
+    "years_of_experience": 0,
+    "current_role": "",
+    "previous_roles": [],
+    "industries": [],
+    "skills": [],
+    "achievements": []
+  },
+  "job_preferences": {
+    "target_roles": [],
+    "preferred_industries": [],
+    "salary_expectation": {
+      "min": 0,
+      "max": 0,
+      "currency": "USD"
+    },
+    "job_types": ["Full-time"],
+    "remote_preference": "hybrid",
+    "travel_willingness": "occasional",
+    "company_sizes": ["medium", "large"]
+  },
+  "deal_breakers": {
+    "exclude_companies": [],
+    "exclude_industries": [],
+    "exclude_locations": [],
+    "min_salary": 0,
+    "max_travel_percentage": 50
+  },
+  "ai_matching_preferences": {
+    "similarity_threshold": 0.8,
+    "prioritize_skills_match": true,
+    "prioritize_industry_match": false,
+    "prioritize_location_match": true,
+    "weight_salary": 0.3,
+    "weight_role_match": 0.4,
+    "weight_company_culture": 0.3
+  }
+}

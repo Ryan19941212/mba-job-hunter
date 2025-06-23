@@ -1,0 +1,110 @@
+{
+  "job_titles": [
+    "Product Manager",
+    "Business Analyst",
+    "Consultant",
+    "Strategy Manager",
+    "Operations Manager",
+    "Marketing Manager",
+    "Finance Manager",
+    "Project Manager",
+    "Business Development Manager",
+    "Data Analyst",
+    "Management Trainee",
+    "Program Manager",
+    "Investment Banking Analyst",
+    "Corporate Development",
+    "Brand Manager"
+  ],
+  "skills": [
+    "MBA",
+    "Master of Business Administration",
+    "Strategy",
+    "Analytics",
+    "Business Intelligence",
+    "Financial Modeling",
+    "SQL",
+    "Python",
+    "Excel",
+    "PowerBI",
+    "Tableau",
+    "Consulting",
+    "Project Management",
+    "Leadership",
+    "Communication",
+    "Presentation",
+    "Agile",
+    "Scrum"
+  ],
+  "companies": [
+    "Google",
+    "Microsoft",
+    "Amazon",
+    "Apple",
+    "Meta",
+    "McKinsey",
+    "BCG",
+    "Bain",
+    "Deloitte",
+    "PwC",
+    "EY",
+    "KPMG",
+    "Goldman Sachs",
+    "JPMorgan",
+    "Morgan Stanley",
+    "Accenture",
+    "IBM",
+    "Salesforce"
+  ],
+  "locations": [
+    "San Francisco",
+    "New York",
+    "Los Angeles",
+    "Chicago",
+    "Boston",
+    "Seattle",
+    "Austin",
+    "Denver",
+    "Atlanta",
+    "Remote",
+    "United States"
+  ],
+  "exclude_keywords": [
+    "Intern",
+    "Internship",
+    "Entry Level",
+    "Junior",
+    "Student",
+    "Part-time",
+    "Temporary",
+    "Contract",
+    "Freelance",
+    "Unpaid"
+  ],
+  "salary_ranges": {
+    "entry_level": {
+      "min": 60000,
+      "max": 90000
+    },
+    "mid_level": {
+      "min": 90000,
+      "max": 150000
+    },
+    "senior_level": {
+      "min": 150000,
+      "max": 300000
+    }
+  },
+  "job_types": [
+    "Full-time",
+    "Part-time",
+    "Contract",
+    "Temporary"
+  ],
+  "experience_levels": [
+    "Entry Level",
+    "Mid Level",
+    "Senior Level",
+    "Executive"
+  ]
+}

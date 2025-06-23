@@ -1,0 +1,76 @@
+{
+  "scrapers": {
+    "indeed": {
+      "enabled": true,
+      "max_pages": 10,
+      "delay_between_requests": 2.0,
+      "timeout_seconds": 30,
+      "max_retries": 3,
+      "rate_limit_per_minute": 30,
+      "respect_robots_txt": true,
+      "user_agents": [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0"
+      ],
+      "search_filters": {
+        "default_location": "United States",
+        "default_sort": "date",
+        "date_posted_days": 7,
+        "include_remote": true,
+        "exclude_recruiters": true
+      }
+    },
+    "linkedin": {
+      "enabled": false,
+      "max_pages": 5,
+      "delay_between_requests": 3.0,
+      "timeout_seconds": 45,
+      "max_retries": 2,
+      "rate_limit_per_minute": 20,
+      "requires_login": true,
+      "headless": true
+    },
+    "levelfyi": {
+      "enabled": false,
+      "max_pages": 5,
+      "delay_between_requests": 1.5,
+      "timeout_seconds": 30,
+      "max_retries": 3,
+      "rate_limit_per_minute": 40
+    }
+  },
+  "global_settings": {
+    "concurrent_scrapers": 2,
+    "max_jobs_per_search": 500,
+    "duplicate_detection": true,
+    "save_raw_html": false,
+    "enable_proxy_rotation": false,
+    "proxy_list": [],
+    "cache_job_details": true,
+    "cache_duration_hours": 24
+  },
+  "data_quality": {
+    "min_title_length": 3,
+    "min_description_length": 50,
+    "required_fields": ["title", "company_name", "source_url"],
+    "validate_salary_ranges": true,
+    "normalize_locations": true,
+    "extract_skills": true,
+    "calculate_relevance_score": true
+  },
+  "notification_settings": {
+    "notify_on_errors": true,
+    "notify_on_completion": false,
+    "error_threshold": 10,
+    "webhook_url": null,
+    "email_notifications": false
+  },
+  "scheduling": {
+    "enable_periodic_scraping": true,
+    "scrape_interval_hours": 24,
+    "preferred_scrape_times": ["09:00", "15:00", "21:00"],
+    "timezone": "UTC",
+    "max_runtime_minutes": 120
+  }
+}
