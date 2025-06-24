@@ -1,6 +1,6 @@
 """
 API Endpoints Package
 
-Contains all API route handlers and endpoint definitions
-for the MBA Job Hunter application.
+All API routes are now in the v1 package.
+This package is kept for backward compatibility.
 """

@@ -81,12 +81,7 @@ class Analysis(Base):
         nullable=False
     )
     
-    # Relationships
-    job: Mapped["Job"] = relationship(
-        "Job",
-        back_populates="analyses",
-        lazy="select"
-    )
+    # Relationships (will be added after fixing import issues)
     
     # Indexes for common queries
     __table_args__ = (

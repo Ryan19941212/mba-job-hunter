@@ -17,8 +17,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 import asyncio
 
 from app.core.config import get_settings
-from app.core.database import init_db, db_manager
-from app.api import health, jobs, analysis
+from app.core.container import init_container, shutdown_container
+from app.api.v1 import jobs_router, analysis_router, health_router
 from app.utils.logger import get_logger
 
 # Initialize logger
@@ -33,27 +33,21 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting MBA Job Hunter API...")
     
-    # Try to initialize database
+    # Initialize dependency injection container
     try:
-        await init_db()
-        logger.info("Database initialized successfully")
+        await init_container()
+        logger.info("Application container initialized successfully")
     except Exception as e:
-        logger.warning(f"Database initialization failed: {e}. Continuing without database...")
-    
-    # Start background tasks if enabled (only if database is available)
-    if settings.ENABLE_BACKGROUND_SCRAPING or settings.ENABLE_AUTO_MATCHING:
-        try:
-            asyncio.create_task(start_background_tasks())
-            logger.info("Background tasks started")
-        except Exception as e:
-            logger.warning(f"Failed to start background tasks: {e}")
+        logger.error(f"Container initialization failed: {e}")
+        raise
     
     yield
     
     # Shutdown
     logger.info("Shutting down MBA Job Hunter API...")
     try:
-        await db_manager.close_connections()
+        await shutdown_container()
+        logger.info("Application container shutdown complete")
     except Exception as e:
         logger.warning(f"Error during shutdown: {e}")
     logger.info("Application shutdown complete")
@@ -87,30 +81,14 @@ if settings.ENVIRONMENT == "production":
     )
 
 # Include API routers
-app.include_router(health.router, prefix="/api/v1", tags=["health"])
-app.include_router(jobs.router, prefix="/api/v1", tags=["jobs"])
-app.include_router(analysis.router, prefix="/api/v1", tags=["analysis"])
+app.include_router(health_router, prefix="/api/v1")
+app.include_router(jobs_router, prefix="/api/v1")
+app.include_router(analysis_router, prefix="/api/v1")
 
 
 
 
-async def start_background_tasks() -> None:
-    """Start background tasks for job scraping and analysis."""
-    from app.services.job_matcher import JobMatcherService
-    from app.scrapers.base import ScraperManager
-    
-    # Initialize services
-    scraper_manager = ScraperManager()
-    job_matcher = JobMatcherService()
-    
-    # Start periodic tasks
-    if settings.ENABLE_BACKGROUND_SCRAPING:
-        asyncio.create_task(scraper_manager.run_periodic_scraping())
-        logger.info("Periodic job scraping enabled")
-    
-    if settings.ENABLE_AUTO_MATCHING:
-        asyncio.create_task(job_matcher.run_periodic_matching())
-        logger.info("Automatic job matching enabled")
+# Remove old background tasks function since it's now handled by container
 
 
 @app.exception_handler(StarletteHTTPException)

@@ -79,13 +79,7 @@ class Company(Base):
         nullable=False
     )
     
-    # Relationships
-    jobs: Mapped[List["Job"]] = relationship(
-        "Job",
-        back_populates="company",
-        cascade="all, delete-orphan",
-        lazy="select"
-    )
+    # Relationships (will be added after fixing import issues)
     
     # Indexes for common queries
     __table_args__ = (
