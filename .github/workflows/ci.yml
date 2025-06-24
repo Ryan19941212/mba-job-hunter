@@ -1,0 +1,505 @@
+name: 🔄 Continuous Integration
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/ci.yml'
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.11'
+  POSTGRES_DB: mba_jobs_test
+  POSTGRES_USER: test_user
+  POSTGRES_PASSWORD: test_password
+  NODE_VERSION: '18'
+
+jobs:
+  # 代碼品質檢查
+  code-quality:
+    name: 🔍 Code Quality
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+        
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+        
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: backend/requirements-dev.txt
+          
+      - name: 📦 Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+          
+      - name: 🖤 Code Formatting (Black)
+        run: |
+          black --check --diff app/ tests/ || {
+            echo "❌ Code formatting issues found. Run 'black app/ tests/' to fix."
+            exit 1
+          }
+          
+      - name: 📋 Import Sorting (isort)
+        run: |
+          isort --check-only --diff app/ tests/ || {
+            echo "❌ Import sorting issues found. Run 'isort app/ tests/' to fix."
+            exit 1
+          }
+          
+      - name: 🔧 Linting (flake8)
+        run: |
+          flake8 app/ tests/ --statistics --tee --output-file=flake8-report.txt
+          
+      - name: 🔒 Security Check (bandit)
+        run: |
+          bandit -r app/ -f json -o bandit-report.json || {
+            echo "❌ Security issues found. Check bandit-report.json for details."
+            cat bandit-report.json
+            exit 1
+          }
+          
+      - name: 📝 Type Checking (mypy)
+        run: |
+          mypy app/ --html-report mypy-report --junit-xml mypy-junit.xml || {
+            echo "❌ Type checking failed. Check mypy-report/ for details."
+            exit 1
+          }
+          
+      - name: 📊 Upload Code Quality Reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: code-quality-reports
+          path: |
+            backend/flake8-report.txt
+            backend/bandit-report.json
+            backend/mypy-report/
+            backend/mypy-junit.xml
+          retention-days: 7
+
+  # 單元測試
+  unit-tests:
+    name: 🧪 Unit Tests
+    runs-on: ubuntu-latest
+    needs: code-quality
+    defaults:
+      run:
+        working-directory: ./backend
+        
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+          
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+          
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+        
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: backend/requirements-dev.txt
+          
+      - name: 🎭 Install Playwright
+        run: |
+          pip install playwright
+          playwright install chromium --with-deps
+          
+      - name: 📦 Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+          
+      - name: 🗃️ Wait for Services
+        run: |
+          timeout 60 bash -c 'until pg_isready -h localhost -p 5432 -U ${{ env.POSTGRES_USER }}; do sleep 1; done'
+          timeout 60 bash -c 'until redis-cli -h localhost -p 6379 ping; do sleep 1; done'
+          
+      - name: 🗃️ Run Database Migrations
+        run: |
+          alembic upgrade head
+        env:
+          DATABASE_URL: postgresql+asyncpg://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}
+          
+      - name: 🧪 Run Unit Tests with Coverage
+        run: |
+          pytest \
+            --cov=app \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-report=term-missing \
+            --cov-fail-under=75 \
+            --junit-xml=pytest-junit.xml \
+            --html=pytest-report.html \
+            --self-contained-html \
+            -v \
+            tests/
+        env:
+          DATABASE_URL: postgresql+asyncpg://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}
+          REDIS_URL: redis://localhost:6379/0
+          OPENAI_API_KEY: test_key_${{ github.run_id }}
+          NOTION_API_KEY: test_key_${{ github.run_id }}
+          SECRET_KEY: test_secret_key_${{ github.run_id }}
+          ENVIRONMENT: testing
+          
+      - name: 📊 Upload Coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./backend/coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+          
+      - name: 📋 Upload Test Results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-results-${{ matrix.python-version || env.PYTHON_VERSION }}
+          path: |
+            backend/htmlcov/
+            backend/pytest-report.html
+            backend/pytest-junit.xml
+            backend/coverage.xml
+          retention-days: 7
+          
+      - name: 📊 Publish Test Results
+        uses: dorny/test-reporter@v1
+        if: success() || failure()
+        with:
+          name: 🧪 Unit Test Results
+          path: backend/pytest-junit.xml
+          reporter: java-junit
+
+  # Docker構建測試
+  docker-build:
+    name: 🐳 Docker Build & Test
+    runs-on: ubuntu-latest
+    needs: code-quality
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+        
+      - name: 🔧 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: 🔍 Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: mba-job-hunter
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            
+      - name: 🐳 Build Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          target: production
+          push: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_DATE=${{ github.event.repository.updated_at }}
+            VERSION=${{ github.sha }}
+            VCS_REF=${{ github.sha }}
+            
+      - name: 🏥 Test Docker Image
+        run: |
+          # Create a test network
+          docker network create test-network
+          
+          # Start dependencies
+          docker run -d --name test-postgres --network test-network \
+            -e POSTGRES_DB=test_db \
+            -e POSTGRES_USER=test_user \
+            -e POSTGRES_PASSWORD=test_pass \
+            postgres:15-alpine
+            
+          docker run -d --name test-redis --network test-network \
+            redis:7-alpine
+          
+          # Wait for services
+          sleep 20
+          
+          # Start the application
+          docker run -d --name test-app --network test-network \
+            -p 8000:8000 \
+            -e DATABASE_URL=postgresql+asyncpg://test_user:test_pass@test-postgres:5432/test_db \
+            -e REDIS_URL=redis://test-redis:6379/0 \
+            -e SECRET_KEY=test_secret \
+            -e ENVIRONMENT=testing \
+            ${{ steps.meta.outputs.tags }}
+          
+          # Wait for app to start
+          sleep 30
+          
+          # Test health endpoint
+          for i in {1..10}; do
+            if curl -f http://localhost:8000/api/v1/health; then
+              echo "✅ Health check passed"
+              break
+            fi
+            echo "⏳ Waiting for health check... ($i/10)"
+            sleep 5
+          done
+          
+          # Test API endpoints
+          curl -f http://localhost:8000/ || exit 1
+          
+          # Cleanup
+          docker stop test-app test-postgres test-redis
+          docker rm test-app test-postgres test-redis
+          docker network rm test-network
+
+  # 整合測試
+  integration-tests:
+    name: 🔗 Integration Tests
+    runs-on: ubuntu-latest
+    needs: [unit-tests, docker-build]
+    defaults:
+      run:
+        working-directory: ./backend
+        
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+        
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          
+      - name: 📦 Install Test Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-asyncio httpx
+          
+      - name: 🔧 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: 🚀 Start Services with Docker Compose
+        run: |
+          # Copy environment template
+          cp .env.example .env || echo "No .env.example found, using defaults"
+          
+          # Override with test configuration
+          cat >> .env << EOF
+          ENVIRONMENT=testing
+          DEBUG=false
+          DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/mba_job_hunter
+          REDIS_URL=redis://redis:6379/0
+          SECRET_KEY=test_secret_key_${{ github.run_id }}
+          OPENAI_API_KEY=test_key
+          NOTION_API_KEY=test_key
+          EOF
+          
+          # Start services
+          docker-compose -f docker-compose.yml up -d --build
+          
+          # Wait for services to be ready
+          echo "⏳ Waiting for services to start..."
+          sleep 60
+          
+          # Check service health
+          for i in {1..20}; do
+            if curl -f http://localhost:8000/api/v1/health; then
+              echo "✅ Services are ready"
+              break
+            fi
+            echo "⏳ Waiting for services... ($i/20)"
+            sleep 10
+          done
+          
+      - name: 🔍 Test Service Health
+        run: |
+          # Test API health
+          response=$(curl -s http://localhost:8000/api/v1/health)
+          echo "Health response: $response"
+          
+          # Test database connectivity
+          docker-compose exec -T postgres pg_isready -U postgres
+          
+          # Test Redis connectivity  
+          docker-compose exec -T redis redis-cli ping
+          
+      - name: 🧪 Run Integration Tests
+        run: |
+          # Run integration tests against the running services
+          pytest tests/test_integration/ -v --tb=short
+        env:
+          API_BASE_URL: http://localhost:8000
+          
+      - name: 📋 Collect Service Logs
+        if: failure()
+        run: |
+          echo "🔍 Collecting service logs for debugging..."
+          docker-compose logs api > api-logs.txt 2>&1
+          docker-compose logs postgres > postgres-logs.txt 2>&1
+          docker-compose logs redis > redis-logs.txt 2>&1
+          
+      - name: 📊 Upload Integration Test Results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: integration-test-results
+          path: |
+            backend/*-logs.txt
+          retention-days: 7
+          
+      - name: 🧹 Cleanup
+        if: always()
+        run: |
+          docker-compose down -v --remove-orphans
+          docker system prune -f
+
+  # 性能測試
+  performance-tests:
+    name: 🚀 Performance Tests
+    runs-on: ubuntu-latest
+    needs: integration-tests
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+        
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          
+      - name: 📦 Install Artillery
+        run: npm install -g artillery@latest
+        
+      - name: 🚀 Start Services
+        run: |
+          cd backend
+          docker-compose up -d --build
+          sleep 60
+          
+      - name: 🎯 Run Load Tests
+        run: |
+          cd backend
+          
+          # Create basic load test configuration
+          cat > load-test.yml << EOF
+          config:
+            target: 'http://localhost:8000'
+            phases:
+              - duration: 60
+                arrivalRate: 5
+                name: "Warm up"
+              - duration: 120
+                arrivalRate: 10
+                name: "Sustained load"
+              - duration: 60
+                arrivalRate: 20
+                name: "Peak load"
+          scenarios:
+            - name: "Health check"
+              weight: 40
+              flow:
+                - get:
+                    url: "/api/v1/health"
+            - name: "Root endpoint"
+              weight: 30
+              flow:
+                - get:
+                    url: "/"
+            - name: "API docs"
+              weight: 30
+              flow:
+                - get:
+                    url: "/api/docs"
+          EOF
+          
+          # Run load test
+          artillery run load-test.yml --output performance-report.json
+          
+          # Generate HTML report
+          artillery report performance-report.json --output performance-report.html
+          
+      - name: 📊 Upload Performance Results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: performance-results
+          path: |
+            backend/performance-report.json
+            backend/performance-report.html
+          retention-days: 30
+          
+      - name: 🧹 Cleanup
+        if: always()
+        run: |
+          cd backend
+          docker-compose down -v
+
+  # 匯總結果
+  ci-success:
+    name: ✅ CI Pipeline Success
+    runs-on: ubuntu-latest
+    needs: [code-quality, unit-tests, docker-build, integration-tests]
+    if: always()
+    
+    steps:
+      - name: 🎉 Check CI Results
+        run: |
+          echo "CI Pipeline Results:"
+          echo "- Code Quality: ${{ needs.code-quality.result }}"
+          echo "- Unit Tests: ${{ needs.unit-tests.result }}"
+          echo "- Docker Build: ${{ needs.docker-build.result }}"
+          echo "- Integration Tests: ${{ needs.integration-tests.result }}"
+          
+          if [[ "${{ needs.code-quality.result }}" == "success" && \
+                "${{ needs.unit-tests.result }}" == "success" && \
+                "${{ needs.docker-build.result }}" == "success" && \
+                "${{ needs.integration-tests.result }}" == "success" ]]; then
+            echo "🎉 All CI checks passed!"
+            exit 0
+          else
+            echo "❌ Some CI checks failed!"
+            exit 1
+          fi

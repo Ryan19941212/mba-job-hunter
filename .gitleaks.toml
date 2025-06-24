@@ -1,0 +1,68 @@
+# GitLeaks Configuration
+title = "MBA Job Hunter Security Configuration"
+
+[extend]
+# Include common rules
+useDefault = true
+
+[[rules]]
+id = "api-keys"
+description = "API Keys"
+regex = '''(?i)(api_?key|apikey|secret_?key|secretkey|access_?token|accesstoken)['"\s]*[:=]?\s*['"]?[a-zA-Z0-9_\-]{20,}'''
+tags = ["key", "API", "token"]
+
+[[rules]]
+id = "openai-api-key"
+description = "OpenAI API Key"
+regex = '''sk-[a-zA-Z0-9]{48}'''
+tags = ["key", "OpenAI"]
+
+[[rules]]
+id = "notion-api-key"
+description = "Notion API Key"
+regex = '''secret_[a-zA-Z0-9]{43}'''
+tags = ["key", "Notion"]
+
+[[rules]]
+id = "database-url"
+description = "Database URL with credentials"
+regex = '''(postgres|mysql|mongodb)://[^:]+:[^@]+@'''
+tags = ["database", "credentials"]
+
+[[rules]]
+id = "jwt-secret"
+description = "JWT Secret"
+regex = '''(?i)(jwt_?secret|jwtSecret)['"\s]*[:=]?\s*['"]?[a-zA-Z0-9_\-]{32,}'''
+tags = ["jwt", "secret"]
+
+# Allowlist patterns
+[[allowlist]]
+description = "Test files and examples"
+files = [
+    '''.*test.*''',
+    '''.*example.*''',
+    '''.*\.example$''',
+    '''.*\.template$''',
+    '''.*mock.*'''
+]
+
+[[allowlist]]
+description = "Environment templates"
+regexes = [
+    '''test_key''',
+    '''your-secret-key''',
+    '''SECRET_KEY_HERE''',
+    '''your-api-key''',
+    '''API_KEY_HERE'''
+]
+
+# Paths to exclude
+[[allowlist]]
+paths = [
+    '''.git/''',
+    '''node_modules/''',
+    '''vendor/''',
+    '''*.log''',
+    '''*.md''',
+    '''*.txt'''
+]

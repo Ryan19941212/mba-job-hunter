@@ -1,0 +1,428 @@
+name: 🔒 Security Scans
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run security scans daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # 代碼安全掃描
+  code-security:
+    name: 🛡️ Code Security Analysis
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+        
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for better analysis
+          
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          
+      - name: 📦 Install Security Tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install bandit[toml] safety semgrep
+          
+      - name: 🔍 Bandit Security Scan
+        run: |
+          echo "🔍 Running Bandit security scan..."
+          bandit -r app/ \
+            -f json \
+            -o bandit-report.json \
+            --severity-level medium \
+            --exclude-dirs tests/ || true
+            
+          bandit -r app/ \
+            -f txt \
+            --severity-level medium \
+            --exclude-dirs tests/ || {
+              echo "⚠️ Bandit found security issues"
+              cat bandit-report.json
+            }
+            
+      - name: 🔒 Safety Vulnerability Check
+        run: |
+          echo "🔒 Checking for known vulnerabilities..."
+          safety check \
+            --json \
+            --output safety-report.json \
+            --ignore 70612 || {  # Ignore specific non-critical vulnerabilities
+              echo "⚠️ Safety found vulnerabilities"
+              cat safety-report.json
+            }
+            
+      - name: 🎯 Semgrep Static Analysis
+        run: |
+          echo "🎯 Running Semgrep static analysis..."
+          semgrep \
+            --config=auto \
+            --json \
+            --output semgrep-report.json \
+            app/ || {
+              echo "⚠️ Semgrep found issues"
+              cat semgrep-report.json
+            }
+            
+      - name: 📊 Upload Security Reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: security-reports-${{ github.sha }}
+          path: |
+            backend/bandit-report.json
+            backend/safety-report.json
+            backend/semgrep-report.json
+          retention-days: 30
+
+  # Docker 安全掃描
+  docker-security:
+    name: 🐳 Docker Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+        
+      - name: 🔧 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: 🐳 Build Docker Image for Scanning
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          target: production
+          load: true
+          tags: mba-job-hunter:security-scan
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          
+      - name: 🔍 Run Trivy Vulnerability Scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'mba-job-hunter:security-scan'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          
+      - name: 📊 Upload Trivy Results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+          
+      - name: 🔍 Run Trivy Config Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: './backend'
+          format: 'sarif'
+          output: 'trivy-config-results.sarif'
+          
+      - name: 📊 Upload Config Scan Results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-config-results.sarif'
+          
+      - name: 🔍 Docker Scout Vulnerability Scan
+        uses: docker/scout-action@v1
+        if: always()
+        with:
+          command: cves
+          image: mba-job-hunter:security-scan
+          format: sarif
+          output: scout-results.sarif
+          
+      - name: 📊 Upload Scout Results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'scout-results.sarif'
+
+  # CodeQL 語義分析
+  codeql-analysis:
+    name: 🧬 CodeQL Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+      
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'python', 'javascript' ]
+        
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+        
+      - name: 🧬 Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended,security-and-quality
+          
+      - name: 🏗️ Autobuild
+        uses: github/codeql-action/autobuild@v3
+        
+      - name: 🔍 Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{matrix.language}}"
+
+  # 密鑰掃描
+  secret-scanning:
+    name: 🔐 Secret Scanning
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: 🔐 TruffleHog Secret Scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: main
+          head: HEAD
+          extra_args: --debug --only-verified
+          
+      - name: 🔍 GitLeaks Secret Scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          config-path: .gitleaks.toml
+
+  # 依賴項安全檢查
+  dependency-security:
+    name: 📦 Dependency Security
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+        
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+        
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          
+      - name: 📦 Install pip-audit
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-audit
+          
+      - name: 🔍 Audit Python Dependencies
+        run: |
+          echo "🔍 Auditing Python dependencies..."
+          pip-audit \
+            --format=json \
+            --output=pip-audit-report.json \
+            --requirement=requirements.txt || {
+              echo "⚠️ pip-audit found vulnerabilities"
+              cat pip-audit-report.json
+            }
+            
+      - name: 📊 Upload Dependency Reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: dependency-security-reports
+          path: |
+            backend/pip-audit-report.json
+          retention-days: 30
+
+  # 基礎設施安全檢查
+  infrastructure-security:
+    name: 🏗️ Infrastructure Security
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+        
+      - name: 🔧 Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        if: hashFiles('**/*.tf') != ''
+        
+      - name: 🔍 Checkov Infrastructure Scan
+        uses: bridgecrewio/checkov-action@master
+        if: hashFiles('**/*.tf', '**/*.yml', '**/*.yaml') != ''
+        with:
+          directory: .
+          framework: terraform,kubernetes,github_actions,dockerfile
+          output_format: sarif
+          output_file_path: checkov-results.sarif
+          
+      - name: 📊 Upload Checkov Results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always() && hashFiles('checkov-results.sarif') != ''
+        with:
+          sarif_file: 'checkov-results.sarif'
+          
+      - name: 🔍 Kubernetes Security Scan
+        if: hashFiles('k8s/**/*.yaml', 'k8s/**/*.yml') != ''
+        run: |
+          # Install kube-score
+          wget https://github.com/zegl/kube-score/releases/latest/download/kube-score_linux_amd64.tar.gz
+          tar xvf kube-score_linux_amd64.tar.gz
+          sudo mv kube-score /usr/local/bin/
+          
+          # Scan Kubernetes manifests
+          echo "🔍 Scanning Kubernetes manifests..."
+          find k8s/ -name "*.yaml" -o -name "*.yml" | xargs kube-score score \
+            --output-format json > kube-score-report.json || true
+            
+      - name: 📊 Upload Infrastructure Reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: infrastructure-security-reports
+          path: |
+            kube-score-report.json
+          retention-days: 30
+
+  # OWASP ZAP 動態掃描
+  dynamic-security:
+    name: 🕷️ Dynamic Security Testing
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+        
+      - name: 🚀 Start Application
+        run: |
+          cd backend
+          docker-compose up -d --build
+          
+          # Wait for application to be ready
+          echo "⏳ Waiting for application to start..."
+          for i in {1..30}; do
+            if curl -f http://localhost:8000/api/v1/health; then
+              echo "✅ Application is ready"
+              break
+            fi
+            sleep 10
+          done
+          
+      - name: 🕷️ OWASP ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.10.0
+        with:
+          target: 'http://localhost:8000'
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-a'
+          
+      - name: 🕷️ OWASP ZAP Full Scan
+        uses: zaproxy/action-full-scan@v0.8.0
+        if: github.event_name == 'schedule'
+        with:
+          target: 'http://localhost:8000'
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-a'
+          
+      - name: 🧹 Cleanup
+        if: always()
+        run: |
+          cd backend
+          docker-compose down -v
+
+  # 安全報告匯總
+  security-summary:
+    name: 📋 Security Summary
+    runs-on: ubuntu-latest
+    needs: [code-security, docker-security, codeql-analysis, secret-scanning, dependency-security, infrastructure-security]
+    if: always()
+    
+    steps:
+      - name: 📊 Download All Security Reports
+        uses: actions/download-artifact@v3
+        with:
+          path: security-reports
+          
+      - name: 📋 Generate Security Summary
+        run: |
+          echo "# 🔒 Security Scan Summary" > security-summary.md
+          echo "" >> security-summary.md
+          echo "## Scan Results" >> security-summary.md
+          echo "" >> security-summary.md
+          echo "| Scan Type | Status | Details |" >> security-summary.md
+          echo "|-----------|--------|---------|" >> security-summary.md
+          echo "| Code Security | ${{ needs.code-security.result }} | Bandit, Safety, Semgrep |" >> security-summary.md
+          echo "| Docker Security | ${{ needs.docker-security.result }} | Trivy, Docker Scout |" >> security-summary.md
+          echo "| CodeQL Analysis | ${{ needs.codeql-analysis.result }} | Semantic analysis |" >> security-summary.md
+          echo "| Secret Scanning | ${{ needs.secret-scanning.result }} | TruffleHog, GitLeaks |" >> security-summary.md
+          echo "| Dependency Security | ${{ needs.dependency-security.result }} | pip-audit |" >> security-summary.md
+          echo "| Infrastructure Security | ${{ needs.infrastructure-security.result }} | Checkov, kube-score |" >> security-summary.md
+          echo "" >> security-summary.md
+          
+          # Check overall security status
+          if [[ "${{ needs.code-security.result }}" == "success" && \
+                "${{ needs.docker-security.result }}" == "success" && \
+                "${{ needs.codeql-analysis.result }}" == "success" && \
+                "${{ needs.secret-scanning.result }}" == "success" && \
+                "${{ needs.dependency-security.result }}" == "success" && \
+                "${{ needs.infrastructure-security.result }}" == "success" ]]; then
+            echo "## ✅ Overall Security Status: PASSED" >> security-summary.md
+            echo "All security scans completed successfully." >> security-summary.md
+          else
+            echo "## ❌ Overall Security Status: FAILED" >> security-summary.md
+            echo "Some security scans found issues that need attention." >> security-summary.md
+          fi
+          
+          echo "" >> security-summary.md
+          echo "📅 Scan Date: $(date)" >> security-summary.md
+          echo "🔗 Commit: ${{ github.sha }}" >> security-summary.md
+          echo "👤 Triggered by: ${{ github.actor }}" >> security-summary.md
+          
+      - name: 📊 Upload Security Summary
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-summary
+          path: security-summary.md
+          retention-days: 90
+          
+      - name: 📢 Security Notification
+        uses: 8398a7/action-slack@v3
+        if: failure() || (success() && github.event_name == 'schedule')
+        with:
+          status: ${{ job.status }}
+          channel: '#security'
+          text: |
+            🔒 Security scan completed with status: ${{ job.status }}
+            📊 Code Security: ${{ needs.code-security.result }}
+            🐳 Docker Security: ${{ needs.docker-security.result }}
+            🧬 CodeQL: ${{ needs.codeql-analysis.result }}
+            🔐 Secret Scan: ${{ needs.secret-scanning.result }}
+            📦 Dependencies: ${{ needs.dependency-security.result }}
+            🏗️ Infrastructure: ${{ needs.infrastructure-security.result }}
+            
+            👤 Triggered by: ${{ github.actor }}
+            🔗 Commit: ${{ github.sha }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

@@ -1,0 +1,76 @@
+# Docker Compose override for CI/CD environments
+version: '3.8'
+
+services:
+  # API service optimized for CI
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+      args:
+        - ENVIRONMENT=testing
+        - BUILD_DATE=${BUILD_DATE:-}
+        - VERSION=${VERSION:-}
+        - VCS_REF=${VCS_REF:-}
+    environment:
+      - ENVIRONMENT=testing
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/mba_job_hunter_test
+      - REDIS_URL=redis://redis:6379/1
+      - SECRET_KEY=test_secret_key_ci
+      - OPENAI_API_KEY=test_key
+      - NOTION_API_KEY=test_key
+      - ENABLE_BACKGROUND_SCRAPING=false
+      - ENABLE_AUTO_MATCHING=false
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # PostgreSQL for testing
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=mba_job_hunter_test
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    tmpfs:
+      - /var/lib/postgresql/data
+
+  # Redis for testing
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    tmpfs:
+      - /data
+
+  # Remove unnecessary services for CI
+  worker:
+    deploy:
+      replicas: 0
+
+  scheduler:
+    deploy:
+      replicas: 0
+
+  nginx:
+    deploy:
+      replicas: 0

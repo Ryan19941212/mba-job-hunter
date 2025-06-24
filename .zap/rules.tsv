@@ -1,0 +1,26 @@
+# ZAP Security Rules Configuration
+# Format: RULE_ID	THRESHOLD	[IGNORE|WARN|FAIL]	[URL_REGEX]
+
+# Ignore false positives for development
+10021	OFF	# X-Content-Type-Options Header Missing
+10020	OFF	# X-Frame-Options Header Missing  
+10016	OFF	# Web Browser XSS Protection Not Enabled
+10017	OFF	# Cross-Domain Misconfiguration
+
+# Monitor but don't fail on these
+10019	WARN	# Content-Type Header Missing
+10035	WARN	# Strict-Transport-Security Header Missing
+10038	WARN	# Content Security Policy Missing
+
+# Fail on critical security issues
+40012	FAIL	# Cross Site Scripting (Reflected)
+40014	FAIL	# Cross Site Scripting (Persistent)
+40016	FAIL	# Cross Site Scripting (Persistent) - Prime
+40017	FAIL	# Cross Site Scripting (Persistent) - Spider
+40018	FAIL	# SQL Injection
+90019	FAIL	# Server Side Code Injection
+90020	FAIL	# Remote OS Command Injection
+
+# API specific rules
+10202	WARN	# Absence of Anti-CSRF Tokens
+10105	WARN	# Weak Authentication Method
