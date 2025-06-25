@@ -18,7 +18,7 @@ import asyncio
 
 from app.core.config import get_settings
 from app.core.container import init_container, shutdown_container
-from app.api.v1 import jobs_router, analysis_router, health_router
+from app.api.v1 import jobs_router, analysis_router, health_router, metrics_router
 from app.utils.logger import get_logger
 
 # Initialize logger
@@ -84,6 +84,7 @@ if settings.ENVIRONMENT == "production":
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(jobs_router, prefix="/api/v1")
 app.include_router(analysis_router, prefix="/api/v1")
+app.include_router(metrics_router)
 
 
 

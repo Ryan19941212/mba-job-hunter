@@ -1,0 +1,242 @@
+{
+  "name": "MBA Job Hunter",
+  "description": "Intelligent job hunting assistant for MBA graduates with AI-powered job matching and analysis",
+  "repository": "https://github.com/yourusername/mba-job-hunter",
+  "keywords": [
+    "mba",
+    "job-hunting",
+    "ai",
+    "fastapi",
+    "python",
+    "career"
+  ],
+  "website": "https://mba-job-hunter.herokuapp.com",
+  "success_url": "/health",
+  "logo": "https://your-logo-url.com/logo.png",
+  "stack": "heroku-22",
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    }
+  ],
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "Standard-1X"
+    },
+    "worker": {
+      "quantity": 1,
+      "size": "Standard-1X"
+    },
+    "scheduler": {
+      "quantity": 1,
+      "size": "Standard-1X"
+    }
+  },
+  "addons": [
+    {
+      "plan": "heroku-postgresql:standard-0",
+      "options": {
+        "version": "15"
+      }
+    },
+    {
+      "plan": "heroku-redis:premium-0"
+    },
+    {
+      "plan": "papertrail:choklad"
+    },
+    {
+      "plan": "newrelic:wayne"
+    },
+    {
+      "plan": "sentry:f1"
+    }
+  ],
+  "env": {
+    "ENVIRONMENT": {
+      "description": "Application environment",
+      "value": "production",
+      "required": true
+    },
+    "SECRET_KEY": {
+      "description": "Secret key for session management and security",
+      "generator": "secret",
+      "required": true
+    },
+    "JWT_SECRET_KEY": {
+      "description": "JWT secret key for token generation",
+      "generator": "secret",
+      "required": true
+    },
+    "DEBUG": {
+      "description": "Enable debug mode",
+      "value": "false",
+      "required": true
+    },
+    "LOG_LEVEL": {
+      "description": "Logging level",
+      "value": "INFO",
+      "required": true
+    },
+    "WORKERS": {
+      "description": "Number of Gunicorn workers",
+      "value": "4",
+      "required": true
+    },
+    "WORKER_TIMEOUT": {
+      "description": "Worker timeout in seconds",
+      "value": "120",
+      "required": true
+    },
+    "DATABASE_POOL_SIZE": {
+      "description": "Database connection pool size",
+      "value": "20",
+      "required": true
+    },
+    "DATABASE_MAX_OVERFLOW": {
+      "description": "Database max overflow connections",
+      "value": "30",
+      "required": true
+    },
+    "REDIS_MAX_CONNECTIONS": {
+      "description": "Redis maximum connections",
+      "value": "50",
+      "required": true
+    },
+    "OPENAI_API_KEY": {
+      "description": "OpenAI API key for AI analysis",
+      "required": true
+    },
+    "OPENAI_MODEL": {
+      "description": "OpenAI model to use",
+      "value": "gpt-3.5-turbo",
+      "required": true
+    },
+    "NOTION_API_KEY": {
+      "description": "Notion API key for data synchronization",
+      "required": false
+    },
+    "NOTION_DATABASE_ID": {
+      "description": "Notion database ID for job storage",
+      "required": false
+    },
+    "LINKEDIN_CLIENT_ID": {
+      "description": "LinkedIn API client ID",
+      "required": false
+    },
+    "LINKEDIN_CLIENT_SECRET": {
+      "description": "LinkedIn API client secret",
+      "required": false
+    },
+    "CORS_ALLOWED_ORIGINS": {
+      "description": "Allowed CORS origins (JSON array)",
+      "value": "[\"https://yourdomain.com\"]",
+      "required": true
+    },
+    "RATE_LIMIT_REQUESTS_PER_MINUTE": {
+      "description": "Rate limit requests per minute",
+      "value": "100",
+      "required": true
+    },
+    "METRICS_ENABLED": {
+      "description": "Enable Prometheus metrics",
+      "value": "true",
+      "required": true
+    },
+    "SENTRY_DSN": {
+      "description": "Sentry DSN for error tracking",
+      "required": false
+    },
+    "SENTRY_ENVIRONMENT": {
+      "description": "Sentry environment",
+      "value": "production",
+      "required": false
+    },
+    "CACHE_DEFAULT_TTL": {
+      "description": "Default cache TTL in seconds",
+      "value": "3600",
+      "required": true
+    },
+    "JOB_SCRAPING_INTERVAL_MINUTES": {
+      "description": "Job scraping interval in minutes",
+      "value": "60",
+      "required": true
+    },
+    "ENABLE_AI_ANALYSIS": {
+      "description": "Enable AI job analysis",
+      "value": "true",
+      "required": true
+    },
+    "ENABLE_NOTION_SYNC": {
+      "description": "Enable Notion synchronization",
+      "value": "true",
+      "required": true
+    },
+    "ENABLE_INDEED_SCRAPING": {
+      "description": "Enable Indeed job scraping",
+      "value": "true",
+      "required": true
+    },
+    "TIMEZONE": {
+      "description": "Application timezone",
+      "value": "Asia/Taipei",
+      "required": true
+    },
+    "AI_CONFIDENCE_THRESHOLD": {
+      "description": "AI analysis confidence threshold",
+      "value": "0.7",
+      "required": true
+    },
+    "MAX_REQUEST_SIZE": {
+      "description": "Maximum request size in bytes",
+      "value": "10485760",
+      "required": true
+    },
+    "ASYNC_POOL_SIZE": {
+      "description": "Async connection pool size",
+      "value": "100",
+      "required": true
+    },
+    "HTTP_TIMEOUT": {
+      "description": "HTTP request timeout in seconds",
+      "value": "30",
+      "required": true
+    }
+  },
+  "scripts": {
+    "postdeploy": "alembic upgrade head && python scripts/health_check.py"
+  },
+  "environments": {
+    "production": {
+      "addons": [
+        {
+          "plan": "heroku-postgresql:standard-2"
+        },
+        {
+          "plan": "heroku-redis:premium-2"
+        }
+      ]
+    },
+    "staging": {
+      "addons": [
+        {
+          "plan": "heroku-postgresql:hobby-dev"
+        },
+        {
+          "plan": "heroku-redis:hobby-dev"
+        }
+      ]
+    }
+  },
+  "review": {
+    "addons": [
+      {
+        "plan": "heroku-postgresql:hobby-dev"
+      },
+      {
+        "plan": "heroku-redis:hobby-dev"
+      }
+    ]
+  }
+}

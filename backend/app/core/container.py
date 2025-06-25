@@ -33,7 +33,7 @@ class SimpleContainer:
         
         # Initialize database manager
         db_manager = DatabaseManager()
-        await db_manager.initialize()
+        await db_manager.init_database()
         self._instances['db_manager'] = db_manager
         
         # Initialize event manager
@@ -48,7 +48,7 @@ class SimpleContainer:
         
         # Cleanup database connections
         if 'db_manager' in self._instances:
-            await self._instances['db_manager'].close()
+            await self._instances['db_manager'].close_connections()
         
         self._instances.clear()
         self._initialized = False

@@ -1,0 +1,161 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "Dockerfile"
+  },
+  "deploy": {
+    "startCommand": "gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT --timeout 120 --keepalive 5 --max-requests 1000 --max-requests-jitter 100 --preload",
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 3
+  },
+  "environments": {
+    "production": {
+      "variables": {
+        "ENVIRONMENT": "production",
+        "DEBUG": "false",
+        "LOG_LEVEL": "INFO",
+        "WORKERS": "4",
+        "MAX_WORKERS": "8",
+        "WORKER_TIMEOUT": "120",
+        "DATABASE_POOL_SIZE": "20",
+        "DATABASE_MAX_OVERFLOW": "30",
+        "REDIS_MAX_CONNECTIONS": "50",
+        "RATE_LIMIT_REQUESTS_PER_MINUTE": "100",
+        "METRICS_ENABLED": "true",
+        "ENABLE_STRUCTURED_LOGGING": "true",
+        "SENTRY_ENVIRONMENT": "production",
+        "CACHE_DEFAULT_TTL": "3600",
+        "JOB_SCRAPING_INTERVAL_MINUTES": "60",
+        "ASYNC_POOL_SIZE": "100",
+        "HTTP_TIMEOUT": "30",
+        "ENABLE_AI_ANALYSIS": "true",
+        "ENABLE_NOTION_SYNC": "true",
+        "ENABLE_INDEED_SCRAPING": "true",
+        "AI_CONFIDENCE_THRESHOLD": "0.7",
+        "TIMEZONE": "Asia/Taipei"
+      }
+    },
+    "staging": {
+      "variables": {
+        "ENVIRONMENT": "staging",
+        "DEBUG": "false",
+        "LOG_LEVEL": "DEBUG",
+        "WORKERS": "2",
+        "DATABASE_POOL_SIZE": "10",
+        "REDIS_MAX_CONNECTIONS": "25",
+        "RATE_LIMIT_REQUESTS_PER_MINUTE": "200",
+        "ENABLE_HEALTH_CHECK_DETAILS": "true",
+        "SENTRY_ENVIRONMENT": "staging"
+      }
+    }
+  },
+  "services": [
+    {
+      "name": "web",
+      "source": {
+        "type": "image",
+        "image": "mba-job-hunter:latest"
+      },
+      "variables": {
+        "PORT": "8000"
+      },
+      "domains": [
+        {
+          "host": "${{RAILWAY_STATIC_URL}}"
+        }
+      ],
+      "healthcheck": {
+        "path": "/health",
+        "timeout": 10,
+        "interval": 30,
+        "retries": 3,
+        "startPeriod": 60
+      },
+      "resources": {
+        "memoryGB": 1,
+        "vCPU": 1
+      }
+    },
+    {
+      "name": "worker",
+      "source": {
+        "type": "image", 
+        "image": "mba-job-hunter:latest"
+      },
+      "command": "celery -A app.services.background_worker worker --loglevel=info --concurrency=4",
+      "resources": {
+        "memoryGB": 0.5,
+        "vCPU": 0.5
+      }
+    },
+    {
+      "name": "scheduler",
+      "source": {
+        "type": "image",
+        "image": "mba-job-hunter:latest"  
+      },
+      "command": "celery -A app.services.background_worker beat --loglevel=info",
+      "resources": {
+        "memoryGB": 0.25,
+        "vCPU": 0.25
+      }
+    }
+  ],
+  "plugins": [
+    {
+      "name": "postgresql",
+      "plan": "postgresql-starter",
+      "config": {
+        "version": "15",
+        "storage": "10GB"
+      }
+    },
+    {
+      "name": "redis",
+      "plan": "redis-starter",
+      "config": {
+        "version": "7",
+        "maxmemory": "100MB"
+      }
+    }
+  ],
+  "monitoring": {
+    "healthCheck": {
+      "enabled": true,
+      "path": "/health",
+      "timeout": 10,
+      "interval": 30
+    },
+    "metrics": {
+      "enabled": true,
+      "path": "/metrics"
+    },
+    "logs": {
+      "enabled": true,
+      "level": "INFO"
+    }
+  },
+  "scaling": {
+    "autoscaling": {
+      "enabled": true,
+      "minReplicas": 1,
+      "maxReplicas": 5,
+      "targetCPU": 70,
+      "targetMemory": 80
+    }
+  },
+  "networking": {
+    "allowPublic": true,
+    "customDomains": [],
+    "internalNetworking": true
+  },
+  "security": {
+    "allowedIPs": [],
+    "rateLimiting": {
+      "enabled": true,
+      "requestsPerMinute": 100,
+      "burstLimit": 20
+    }
+  }
+}

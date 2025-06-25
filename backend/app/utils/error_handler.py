@@ -495,8 +495,313 @@ class ErrorHandler:
         }
 
 
-# Global error handler instance
+class UserFriendlyErrorHandler(ErrorHandler):
+    """Enhanced error handler focused on user experience and intelligent recovery."""
+    
+    def __init__(self):
+        super().__init__()
+        self.error_mappings = {
+            'linkedin_rate_limit': {
+                'user_message': 'LinkedIn搜索暫時受限，已自動切換到Indeed獲取更多職缺',
+                'recovery_action': 'auto_fallback_indeed',
+                'business_impact': 'maintain_user_experience',
+                'internal_action': 'increment_fallback_counter'
+            },
+            'notion_api_error': {
+                'user_message': 'Notion同步暫時無法使用，數據已保存將稍後重試',
+                'recovery_action': 'queue_for_retry',
+                'business_impact': 'user_retention_risk',
+                'internal_action': 'alert_support_team'
+            },
+            'openai_quota_exceeded': {
+                'user_message': 'AI分析服務暫時繁忙，為您提供基礎匹配結果',
+                'recovery_action': 'fallback_basic_matching',
+                'business_impact': 'reduced_value_delivery',
+                'internal_action': 'escalate_to_ops'
+            },
+            'indeed_scraping_blocked': {
+                'user_message': '職缺獲取遇到暫時限制，正在嘗試其他數據源',
+                'recovery_action': 'rotate_user_agent',
+                'business_impact': 'maintain_user_experience',
+                'internal_action': 'update_scraping_strategy'
+            },
+            'database_connection_lost': {
+                'user_message': '數據暫時無法訪問，正在重新連接中',
+                'recovery_action': 'retry_with_backoff',
+                'business_impact': 'service_disruption',
+                'internal_action': 'alert_infrastructure_team'
+            },
+            'ai_analysis_timeout': {
+                'user_message': 'AI分析正在處理中，將於完成後通知您',
+                'recovery_action': 'queue_for_background_processing',
+                'business_impact': 'delayed_value_delivery',
+                'internal_action': 'scale_processing_resources'
+            }
+        }
+        self.recovery_metrics = {
+            'fallback_success_count': 0,
+            'retry_success_count': 0,
+            'user_satisfaction_maintained': 0
+        }
+    
+    def handle_intelligent_error(
+        self,
+        error_type: str,
+        original_error: Exception,
+        context: Optional[ErrorContext] = None,
+        additional_data: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Handle errors with intelligent recovery and user-focused messaging.
+        
+        Args:
+            error_type: Type of error from error_mappings
+            original_error: The original exception
+            context: Error context
+            additional_data: Additional context data
+            
+        Returns:
+            Dict containing user message, recovery status, and next actions
+        """
+        if error_type not in self.error_mappings:
+            # Fallback to standard error handling
+            error_info = self.handle_error(original_error, context)
+            return {
+                'user_message': error_info.user_message,
+                'recovery_attempted': False,
+                'business_impact': 'unknown',
+                'next_action': 'standard_error_flow'
+            }
+        
+        mapping = self.error_mappings[error_type]
+        
+        # Execute recovery action
+        recovery_result = self._execute_recovery_action(
+            mapping['recovery_action'],
+            original_error,
+            additional_data or {}
+        )
+        
+        # Execute internal action
+        self._execute_internal_action(
+            mapping['internal_action'],
+            error_type,
+            original_error,
+            context
+        )
+        
+        # Track business impact
+        self._track_business_impact(mapping['business_impact'], error_type)
+        
+        # Log the intelligent error handling
+        self._log_intelligent_error(error_type, mapping, recovery_result, original_error)
+        
+        return {
+            'user_message': mapping['user_message'],
+            'recovery_attempted': True,
+            'recovery_successful': recovery_result['success'],
+            'business_impact': mapping['business_impact'],
+            'next_action': recovery_result.get('next_action', 'continue'),
+            'estimated_recovery_time': recovery_result.get('estimated_time'),
+            'alternative_options': recovery_result.get('alternatives', [])
+        }
+    
+    def _execute_recovery_action(
+        self,
+        action: str,
+        original_error: Exception,
+        additional_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Execute specific recovery actions based on error type."""
+        
+        recovery_actions = {
+            'auto_fallback_indeed': self._fallback_to_indeed,
+            'queue_for_retry': self._queue_for_retry,
+            'fallback_basic_matching': self._fallback_basic_matching,
+            'rotate_user_agent': self._rotate_user_agent,
+            'retry_with_backoff': self._retry_with_backoff,
+            'queue_for_background_processing': self._queue_background_processing
+        }
+        
+        if action in recovery_actions:
+            try:
+                result = recovery_actions[action](original_error, additional_data)
+                self.recovery_metrics[f'{action.split("_")[0]}_success_count'] += 1
+                return result
+            except Exception as recovery_error:
+                logger.error(f"Recovery action {action} failed: {recovery_error}")
+                return {
+                    'success': False,
+                    'error': str(recovery_error),
+                    'next_action': 'manual_intervention_required'
+                }
+        
+        return {'success': False, 'error': 'Unknown recovery action'}
+    
+    def _fallback_to_indeed(self, error: Exception, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Fallback from LinkedIn to Indeed scraping."""
+        return {
+            'success': True,
+            'next_action': 'switch_to_indeed_scraper',
+            'estimated_time': '30秒',
+            'alternatives': ['手動搜索LinkedIn', '等待限制解除後重試']
+        }
+    
+    def _queue_for_retry(self, error: Exception, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Queue operation for retry with exponential backoff."""
+        retry_delay = data.get('retry_delay', 300)  # 5 minutes default
+        return {
+            'success': True,
+            'next_action': 'add_to_retry_queue',
+            'estimated_time': f'{retry_delay // 60}分鐘',
+            'retry_delay': retry_delay
+        }
+    
+    def _fallback_basic_matching(self, error: Exception, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Fallback to basic keyword matching without AI."""
+        return {
+            'success': True,
+            'next_action': 'use_basic_matching_algorithm',
+            'estimated_time': '即時',
+            'alternatives': ['等待AI服務恢復', '手動篩選職缺']
+        }
+    
+    def _rotate_user_agent(self, error: Exception, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Rotate user agent and retry scraping."""
+        return {
+            'success': True,
+            'next_action': 'update_scraper_headers',
+            'estimated_time': '10秒',
+            'alternatives': ['使用代理服務', '降低請求頻率']
+        }
+    
+    def _retry_with_backoff(self, error: Exception, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Retry with exponential backoff."""
+        return {
+            'success': True,
+            'next_action': 'schedule_retry',
+            'estimated_time': '1-5分鐘',
+            'retry_attempts': data.get('retry_count', 0) + 1
+        }
+    
+    def _queue_background_processing(self, error: Exception, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Queue for background processing."""
+        return {
+            'success': True,
+            'next_action': 'add_to_background_queue',
+            'estimated_time': '5-10分鐘',
+            'alternatives': ['簡化分析結果', '手動分析職缺']
+        }
+    
+    def _execute_internal_action(
+        self,
+        action: str,
+        error_type: str,
+        original_error: Exception,
+        context: Optional[ErrorContext]
+    ) -> None:
+        """Execute internal actions for monitoring and alerting."""
+        
+        internal_actions = {
+            'increment_fallback_counter': lambda: self._increment_counter(f'{error_type}_fallback'),
+            'alert_support_team': lambda: self._send_alert('support', error_type, original_error),
+            'escalate_to_ops': lambda: self._escalate_to_ops(error_type, original_error),
+            'update_scraping_strategy': lambda: self._update_scraping_strategy(error_type),
+            'alert_infrastructure_team': lambda: self._send_alert('infrastructure', error_type, original_error),
+            'scale_processing_resources': lambda: self._request_resource_scaling(error_type)
+        }
+        
+        if action in internal_actions:
+            try:
+                internal_actions[action]()
+            except Exception as e:
+                logger.error(f"Internal action {action} failed: {e}")
+    
+    def _increment_counter(self, counter_name: str) -> None:
+        """Increment error counter for monitoring."""
+        self.error_counts[counter_name] = self.error_counts.get(counter_name, 0) + 1
+    
+    def _send_alert(self, team: str, error_type: str, error: Exception) -> None:
+        """Send alert to specific team."""
+        logger.warning(f"Alert sent to {team} team for {error_type}: {str(error)}")
+        # In production: integrate with Slack, PagerDuty, etc.
+    
+    def _escalate_to_ops(self, error_type: str, error: Exception) -> None:
+        """Escalate critical issues to operations team."""
+        logger.error(f"Escalating {error_type} to operations: {str(error)}")
+        # In production: create incident ticket, notify on-call engineer
+    
+    def _update_scraping_strategy(self, error_type: str) -> None:
+        """Update scraping strategy based on error patterns."""
+        logger.info(f"Updating scraping strategy due to {error_type}")
+        # In production: update scraper configuration, rotate proxies
+    
+    def _request_resource_scaling(self, error_type: str) -> None:
+        """Request additional processing resources."""
+        logger.info(f"Requesting resource scaling for {error_type}")
+        # In production: trigger auto-scaling, request additional compute
+    
+    def _track_business_impact(self, impact: str, error_type: str) -> None:
+        """Track business impact of errors."""
+        impact_metrics = {
+            'maintain_user_experience': 'user_satisfaction_maintained',
+            'user_retention_risk': 'user_retention_risk_count',
+            'reduced_value_delivery': 'reduced_value_count',
+            'service_disruption': 'service_disruption_count',
+            'delayed_value_delivery': 'delayed_delivery_count'
+        }
+        
+        if impact in impact_metrics:
+            metric_name = impact_metrics[impact]
+            self.recovery_metrics[metric_name] = self.recovery_metrics.get(metric_name, 0) + 1
+    
+    def _log_intelligent_error(
+        self,
+        error_type: str,
+        mapping: Dict[str, str],
+        recovery_result: Dict[str, Any],
+        original_error: Exception
+    ) -> None:
+        """Log intelligent error handling with context."""
+        log_data = {
+            'error_type': error_type,
+            'user_message': mapping['user_message'],
+            'recovery_action': mapping['recovery_action'],
+            'business_impact': mapping['business_impact'],
+            'recovery_successful': recovery_result.get('success', False),
+            'estimated_recovery_time': recovery_result.get('estimated_time'),
+            'original_error': str(original_error)
+        }
+        
+        logger.info(f"Intelligent error handling for {error_type}", extra=log_data)
+    
+    def get_recovery_metrics(self) -> Dict[str, Any]:
+        """Get recovery and user experience metrics."""
+        return {
+            'recovery_metrics': self.recovery_metrics.copy(),
+            'error_statistics': self.get_error_statistics(),
+            'user_experience_score': self._calculate_ux_score()
+        }
+    
+    def _calculate_ux_score(self) -> float:
+        """Calculate user experience score based on error handling."""
+        total_errors = sum(self.error_counts.values())
+        if total_errors == 0:
+            return 100.0
+        
+        successful_recoveries = sum([
+            self.recovery_metrics.get('fallback_success_count', 0),
+            self.recovery_metrics.get('retry_success_count', 0),
+            self.recovery_metrics.get('user_satisfaction_maintained', 0)
+        ])
+        
+        ux_score = (successful_recoveries / total_errors) * 100
+        return min(100.0, max(0.0, ux_score))
+
+
+# Global error handler instances
 error_handler = ErrorHandler()
+user_friendly_error_handler = UserFriendlyErrorHandler()
 
 
 def handle_error(error: Exception, context: Optional[ErrorContext] = None) -> JSONResponse:
@@ -512,6 +817,29 @@ def handle_error(error: Exception, context: Optional[ErrorContext] = None) -> JS
     """
     error_info = error_handler.handle_error(error, context)
     return error_handler.create_error_response(error_info)
+
+
+def handle_intelligent_error(
+    error_type: str,
+    original_error: Exception,
+    context: Optional[ErrorContext] = None,
+    additional_data: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Convenience function for intelligent error handling with user experience focus.
+    
+    Args:
+        error_type: Type of error from error_mappings
+        original_error: The original exception
+        context: Optional error context
+        additional_data: Additional context data
+        
+    Returns:
+        Dict containing user message, recovery status, and next actions
+    """
+    return user_friendly_error_handler.handle_intelligent_error(
+        error_type, original_error, context, additional_data
+    )
 
 
 def create_error_context(

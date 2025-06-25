@@ -12,7 +12,6 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings
 from pydantic import Field, HttpUrl
-from pydantic import PostgresDsn, RedisDsn
 
 
 class Settings(BaseSettings):
@@ -34,12 +33,12 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     
     # Database
-    DATABASE_URL: PostgresDsn = Field(..., env="DATABASE_URL")
+    DATABASE_URL: str = Field(..., env="DATABASE_URL")
     DATABASE_POOL_SIZE: int = Field(5, env="DATABASE_POOL_SIZE")
     DATABASE_MAX_OVERFLOW: int = Field(10, env="DATABASE_MAX_OVERFLOW")
     
     # Redis
-    REDIS_URL: RedisDsn = Field(..., env="REDIS_URL")
+    REDIS_URL: str = Field(..., env="REDIS_URL")
     REDIS_EXPIRE_SECONDS: int = Field(3600, env="REDIS_EXPIRE_SECONDS")
     
     # API Keys
